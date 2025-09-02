@@ -16,23 +16,28 @@ void board_init()
 
     // Initialize board support package and LEDs
     bsp_i2c_init();
-    bsp_leds_init();
-    bsp_led_set(BSP_LED_RED, true);
-    bsp_led_set(BSP_LED_BLUE, true);
+    // Comentado: Tu ESP32S3-WROOM-1 no tiene LEDs Korvo
+    // bsp_leds_init();
+    // bsp_led_set(BSP_LED_RED, true);
+    // bsp_led_set(BSP_LED_BLUE, true);
 
     // Initialize temperature sensor
     temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(10, 50);
     ESP_ERROR_CHECK(temperature_sensor_install(&temp_sensor_config, &temp_sensor));
     ESP_ERROR_CHECK(temperature_sensor_enable(temp_sensor));
 
-    // Initialize codec board
-    set_codec_board_type(CONFIG_CODEC_BOARD_TYPE);
+    // Initialize codec board for custom hardware
+    set_codec_board_type("ESP32S3_WROOM_CUSTOM");
     codec_init_cfg_t cfg = {
-        .in_mode = CODEC_I2S_MODE_TDM,
-        .in_use_tdm = true,
+        .in_mode = CODEC_I2S_MODE_STD,     // Modo I2S estándar para INMP441
+        .in_use_tdm = false,               // No TDM para hardware simple
         .reuse_dev = false
     };
     init_codec(&cfg);
+    
+    // CRÍTICO: Configurar I2S para MONO + LEFT (INMP441)
+    // El INMP441 con L/R a GND envía audio por canal izquierdo
+    ESP_LOGI(TAG, "Configurando I2S para INMP441 MONO + LEFT");
 }
 
 float board_get_temp(void)

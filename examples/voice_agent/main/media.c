@@ -36,17 +36,26 @@ static int build_capturer_system(void)
     capturer_system.audio_encoder = esp_capture_new_audio_encoder();
     NULL_CHECK(capturer_system.audio_encoder, "Failed to create audio encoder");
 
-    // 2. Create audio source
+    // 2. Create audio source - CONFIGURACIÓN ORIGINAL FUNCIONAL
     esp_codec_dev_handle_t record_handle = get_record_handle();
     NULL_CHECK(record_handle, "Failed to get record handle");
 
+    // Configuración AEC (funcional) pero con AEC desactivado
     esp_capture_audio_aec_src_cfg_t codec_cfg = {
         .record_handle = record_handle,
-        .channel = 4,
-        .channel_mask = 1 | 2
+        .channel = 1,        // INMP441 es mono (1 canal)
+        .channel_mask = 1     // Solo canal izquierdo
     };
     capturer_system.audio_source = esp_capture_new_audio_aec_src(&codec_cfg);
     NULL_CHECK(capturer_system.audio_source, "Failed to create audio source");
+    
+    // CAMBIO MÍNIMO: Solo aumentar ganancia (funcional)
+    esp_codec_dev_set_in_gain(record_handle, 20);  // 20dB gain (conservador)
+    
+    ESP_LOGI(TAG, "✅ Audio source creado con AEC (funcional)");
+    ESP_LOGI(TAG, "🎤 Ganancia configurada: 20dB para INMP441");
+    ESP_LOGI(TAG, "📊 Configuración: 48kHz, mono, 16-bit");
+    ESP_LOGI(TAG, "🎯 Frame size esperado: 960 samples (20ms @ 48kHz)");
 
     // 3. Create capture path
     esp_capture_simple_path_cfg_t path_cfg = {
@@ -77,6 +86,9 @@ static int build_renderer_system(void)
 
     // Set initial speaker volume
     esp_codec_dev_set_out_vol(i2s_cfg.play_handle, CONFIG_DEFAULT_PLAYBACK_VOL);
+    
+    // CRÍTICO: Mantener ganancia alta como Wheatley (NO sobrescribir)
+    // esp_codec_dev_set_in_gain(get_record_handle(), 30);  // Ya configurado arriba
 
     // 2. Create AV renderer
     // For this example, this only includes an audio renderer.
@@ -89,10 +101,10 @@ static int build_renderer_system(void)
     renderer_system.av_renderer_handle = av_render_open(&render_cfg);
     NULL_CHECK(renderer_system.av_renderer_handle, "Failed to create AV renderer");
 
-    // 3. Set frame info
+    // 3. Set frame info - ESTÁNDAR OPUS 48kHz
     av_render_audio_frame_info_t frame_info = {
-        .sample_rate = 16000,
-        .channel = 2,
+        .sample_rate = 48000,    // ESTÁNDAR OPUS (recomendado por IA)
+        .channel = 1,            // MAX98357 es mono (1 canal)
         .bits_per_sample = 16,
     };
     av_render_set_fixed_frame_info(renderer_system.av_renderer_handle, &frame_info);

@@ -10,6 +10,7 @@ from livekit.agents import (
     function_tool,
     get_job_context,
     ToolError,
+    events,
 )
 from livekit.plugins import (
     openai,
@@ -91,19 +92,43 @@ class Assistant(Agent):
             raise ToolError("Unable to retrieve CPU temperature")
 
 async def entrypoint(ctx: agents.JobContext):
+    # PRIMERO conectar al room
+    await ctx.connect(room_name="esp32-room-001")
+    
+    # DESPUÉS crear e iniciar la sesión
     session = AgentSession(
-        stt=deepgram.STT(model="nova-3", language="multi"),
+        stt=deepgram.STT(
+            model="nova-3", 
+            language="multi",
+            interim_results=True,  # Resultados intermedios
+            punctuate=True,        # Puntuación automática
+            smart_format=True      # Formato inteligente
+        ),
         llm=openai.LLM(model="gpt-4o-mini"),
         tts=cartesia.TTS(model="sonic-2", voice="c99d36f3-5ffd-4253-803a-535c1bc9c306"),
-        vad=silero.VAD.load(),
-        turn_detection=MultilingualModel(),
+        vad=silero.VAD.load(
+            min_speech_duration_ms=250,  # Conservador: 250ms de habla
+            min_silence_duration_ms=500, # Conservador: 500ms de silencio
+            speech_pad_ms=100,           # Padding de 100ms
+            activation_threshold=0.4     # LIGERAMENTE más sensible (era 0.5)
+        ),
+        # Sin turn detection por ahora para simplificar
     )
+    # AGREGAR LOGGING DE AUDIO PARA DEBUGGING
+    @session.on(events.TranscriptReceived)
+    def on_transcript(ev: events.TranscriptReceived):
+        if ev.alternatives:
+            print(f"🎤 STT: '{ev.alternatives[0].text}' (final={ev.is_final})")
+    
+    @session.on(events.ErrorEvent)
+    def on_error(e: events.ErrorEvent):
+        print(f"❌ AGENT ERROR: {e.error} (recoverable={e.recoverable})")
+    
     await session.start(
         room=ctx.room,
         agent=Assistant(),
         room_input_options=RoomInputOptions()
     )
-    await ctx.connect()
 
 if __name__ == "__main__":
     agents.cli.run_app(agents.WorkerOptions(entrypoint_fnc=entrypoint))

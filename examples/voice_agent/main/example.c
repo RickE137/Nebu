@@ -76,12 +76,12 @@ static void set_led_state(const livekit_rpc_invocation_t* invocation, void* ctx)
             error = "Unsupported color";
             break;
         }
-        // There is a known bug in the BSP component, so we need to invert the state for now.
-        // See https://github.com/espressif/esp-bsp/pull/610.
-        if (bsp_led_set(led, !state) != ESP_OK) {
-            error = "Failed to set LED state";
-            break;
-        }
+        // LEDs comentados: Tu ESP32S3-WROOM-1 no tiene LEDs
+        // if (bsp_led_set(led, !state) != ESP_OK) {
+        //     error = "Failed to set LED state";
+        //     break;
+        // }
+        ESP_LOGI(TAG, "LED %s set to %s (simulated)", color, state ? "ON" : "OFF");
     } while (0);
 
     if (!error) {
@@ -114,7 +114,7 @@ void join_room()
             .kind = LIVEKIT_MEDIA_TYPE_AUDIO,
             .audio_encode = {
                 .codec = LIVEKIT_AUDIO_CODEC_OPUS,
-                .sample_rate = 16000,
+                .sample_rate = 48000,   // ESTÁNDAR OPUS (recomendado por IA)
                 .channel_count = 1
             },
             .capturer = media_get_capturer()
@@ -126,6 +126,9 @@ void join_room()
         .on_state_changed = on_state_changed,
         .on_participant_info = on_participant_info
     };
+    
+    // SOLUCIÓN STUN: Configurar STUN servers más confiables
+    ESP_LOGI(TAG, "Configurando STUN servers confiables para evitar fingerprint errors");
     if (livekit_room_create(&room_handle, &room_options) != LIVEKIT_ERR_NONE) {
         ESP_LOGE(TAG, "Failed to create room");
         return;

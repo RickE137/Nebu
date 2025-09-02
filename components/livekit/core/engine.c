@@ -1096,7 +1096,7 @@ engine_handle_t engine_init(const engine_options_t *options)
     if (xTaskCreate(
         engine_task,
         "engine_task",
-        4096,
+        8192,  // Aumentado de 4096 a 8192 para evitar stack overflow con MbedTLS
         (void *)eng,
         5,
         &eng->task_handle
